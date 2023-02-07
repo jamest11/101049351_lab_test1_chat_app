@@ -1,38 +1,53 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const cookieParser = require("cookie-parser");
+const session = require('express-session');
+const routes = require('./routes');
+const Message = require('./models/message')
 
 const app = express();
 
 const http = require('http').Server(app);
 const io = require('socket.io')(http)
 
-const rooms = ['News', 'Sports', 'Misc']
+app.use(cookieParser());
+app.use(session({
+  secret: process.env.SECRET_KEY,
+  saveUninitialized:true,
+  cookie: { maxAge: 1000 * 60 * 60 * 24 },
+  resave: false
+}));
 
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: true })); 
+app.use(express.static('static'));
 
-app.get('/', (req, res) => {
-  res.sendFile('/pages/index.html', { root: __dirname })
+mongoose.connect(process.env.DB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  dbName: 'ChatApp'
+}).then(() => {
+  console.log('Successfully connected to the database mongoDB Atlas Server');    
+}).catch(err => {
+  console.log('Could not connect to the database. Exiting now...', err);
+  process.exit();
 });
 
-app.get('/chat', (req, res) => {
-  if(!req.query.room || !rooms.includes(req.query.room)) {
-    res.redirect('/');
-  }
-
-  res.sendFile('/pages/chat.html', { root: __dirname });
-});
+app.use(routes);
 
 io.on('connection', (socket) => {
-  console.log(`A new user is connected: ${socket.id}`)
-
   socket.on('join', (room) => {
     socket.join(room);
-    io.to(room).emit('message', { message: 'User joined chat room'});
   });
 
   socket.on('message', (data) => {
+    const message = new Message({ from_user: data.username, room: data.room, message: data.message });
+    message.save((err) => {
+      if(err) {
+        console.log(err);
+      }
+    });
+
     io.to(data.room).emit('message', data);
   });
 
@@ -50,6 +65,6 @@ io.on('connection', (socket) => {
 
 });
 
-http.listen(3000, () => {
-  console.log(`Server is listening on port ${3000}`);
+http.listen(process.env.PORT, () => {
+  console.log(`Server is listening on port ${process.env.PORT}`);
 });
