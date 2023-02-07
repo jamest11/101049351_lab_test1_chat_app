@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chat Room</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+  <script src="https://code.jquery.com/jquery-3.2.1.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.min.js" integrity="sha384-+sLIOodYLS7CIrQpBjl+C7nPvqq+FbNUBDunl/OZv93DB7Ln/533i8e/mZXLi/P+" crossorigin="anonymous"></script>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+<div class="container">
+    <br>
+    <div class="jumbotron">
+        <h1 class="display-4">Send Message</h1>
+        <h2 id="roomName"></h2>
+        <br>
+        <input id="name" class="form-control" placeholder="Name">
+        <br>
+        <textarea id="message" class="form-control" placeholder="Your Message Here"></textarea>
+        <br>
+        <button id="send" class="btn btn-success">Send</button>
+    </div>
+    <div style="height: 300px; overflow: auto; display: flex; flex-direction: column-reverse;">
+        <div id="messages">
+
+        </div>
+    </div>
+
+</div>
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const room = urlParams.get('room');
+
+    const socket = io();
+
+    $(() => {
+        if(urlParams.get('room')) {
+            $('#roomName').text(urlParams.get('room'))
+        }
+
+        $('#send').click(()=>{
+            const data = { message: $('#message').val(), room };
+            socket.emit('message', data);
+        });
+    });
+
+    socket.on('connect', () => {  
+        socket.emit('join', urlParams.get('room'));    
+        console.log(socket.id);
+    });
+
+    socket.on('message', (data) => {
+        $('#messages').append(`<p>${data.message}</p>`);
+    });
+
+    socket.on('typing-start', (data) => {
+        console.log(data.id);
+        $('#messages').append(`<p id=${data.id}>User is typing...</p>`);
+    });
+
+    socket.on('typing-stop', (data) => {
+        console.log('stopped typing');
+        $(`#${data.id}`).remove();
+    });
+
+    $('#message')
+        .focusin(() => {
+            const data = { id: socket.id, room };
+            socket.emit('typing-start', data);
+        })
+        .focusout(() => { 
+            const data = { id: socket.id, room };
+            socket.emit('typing-stop', data);
+        });
+</script>
+</body>
+</html>
