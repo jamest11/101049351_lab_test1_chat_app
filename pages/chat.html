@@ -44,6 +44,7 @@
             if($('#message').val().trim().length > 0) {
                 const data = { message: $('#message').val(), room, username };
                 socket.emit('message', data);
+                $('#message').val('');
             }
         });
 
